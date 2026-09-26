@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Despesas Pessoais - Priscila Rodrigues</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --accent-green: #10b981;
+            --accent-blue: #0284c7;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 24px; }
+        .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+        .header-card { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border-radius: 16px; padding: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .user-info h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+        .user-fields { display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.95rem; }
+        .field-item { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.15); padding: 6px 14px; border-radius: 20px; }
+        .field-item input { background: transparent; border: none; color: white; font-size: 0.95rem; outline: none; font-weight: 600; }
+        .actions-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .action-group { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; color: white; }
+        .btn-import { background-color: #059669; }
+        .btn-csv { background-color: var(--accent-blue); }
+        .btn-pdf { background-color: #dc2626; }
+        .btn-word { background-color: #2563eb; }
+        #excelInput { display: none; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px; }
+        .stat-icon { width: 56px; height: 56px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: #ecfdf5; color: #10b981; }
+        .stat-details h3 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-details .value { font-size: 1.6rem; font-weight: 700; }
+        .card { background: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid var(--border-color); }
+        .chart-container { position: relative; height: 350px; width: 100%; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; }
+        th, td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
+        th { background-color: #f1f5f9; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-card">
+        <div class="user-info">
+            <h1><i class="fa-solid fa-user-graduate"></i> Dashboard de Despesas Pessoais</h1>
+            <p>Painel Financeiro com Reajuste Atualizado</p>
+        </div>
+        <div class="user-fields">
+            <div class="field-item">
+                <i class="fa-solid fa-user"></i>
+                <span><strong>Aluno:</strong> Priscila Rodrigues</span>
+            </div>
+            <div class="field-item">
+                <i class="fa-solid fa-graduation-cap"></i>
+                <label><strong>Curso:</strong></label>
+                <input type="text" id="cursoInput" value="Engenharia de Software">
+            </div>
+            <div class="field-item">
+                <i class="fa-solid fa-calendar-days"></i>
+                <label><strong>Data:</strong></label>
+                <input type="date" id="dataInput" value="2026-09-26">
+            </div>
+        </div>
+    </div>
+
+    <div class="actions-card">
+        <div class="action-group">
+            <label for="excelInput" class="btn btn-import"><i class="fa-solid fa-file-excel"></i> Importar Excel</label>
+            <input type="file" id="excelInput" accept=".xlsx, .xls">
+        </div>
+        <div class="action-group">
+            <button class="btn btn-csv" onclick="exportToCSV()"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+            <button class="btn btn-pdf" onclick="window.print()"><i class="fa-solid fa-file-pdf"></i> Salvar / Imprimir PDF</button>
+            <button class="btn btn-word" onclick="exportToWord()"><i class="fa-solid fa-file-word"></i> Exportar Word</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div class="stat-details">
+                <h3>Total Geral (Aumentado +25%)</h3>
+                <div class="value" id="statTotal">R$ 0,00</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="stat-details">
+                <h3>Média por Despesa</h3>
+                <div class="value" id="statMedia">R$ 0,00</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <div class="stat-details">
+                <h3>Maior Despesa</h3>
+                <div class="value" id="statMaior">R$ 0,00</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3><i class="fa-solid fa-chart-pie"></i> Gastos Aumentados por Categoria</h3>
+        <div class="chart-container">
+            <canvas id="expensesChart"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3><i class="fa-solid fa-list-check"></i> Detalhamento das Despesas</h3>
+        <table id="expensesTable">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Categoria</th>
+                    <th>Descrição</th>
+                    <th>Pagamento</th>
+                    <th>Original (R$)</th>
+                    <th>Aumentado (+25%) (R$)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let despesasData = [
+        {"Data":"01/09/2026","Categoria":"Alimentação","Descrição":"Supermercado","Forma":"Cartão de débito","Valor":285.4},
+        {"Data":"02/09/2026","Categoria":"Transporte","Descrição":"Combustível","Forma":"Cartão de crédito","Valor":180.0},
+        {"Data":"03/09/2026","Categoria":"Moradia","Descrição":"Conta de energia","Forma":"Pix","Valor":145.8},
+        {"Data":"04/09/2026","Categoria":"Alimentação","Descrição":"Restaurante","Forma":"Cartão de crédito","Valor":72.5},
+        {"Data":"05/09/2026","Categoria":"Lazer","Descrição":"Cinema","Forma":"Cartão de débito","Valor":48.0},
+        {"Data":"06/09/2026","Categoria":"Saúde","Descrição":"Farmácia","Forma":"Pix","Valor":63.9},
+        {"Data":"07/09/2026","Categoria":"Transporte","Descrição":"Aplicativo de transporte","Forma":"Pix","Valor":32.7},
+        {"Data":"09/09/2026","Categoria":"Educação","Descrição":"Livro","Forma":"Cartão de crédito","Valor":89.9},
+        {"Data":"10/09/2026","Categoria":"Alimentação","Descrição":"Padaria","Forma":"Dinheiro","Valor":25.0},
+        {"Data":"12/09/2026","Categoria":"Moradia","Descrição":"Internet","Forma":"Pix","Valor":99.9},
+        {"Data":"14/09/2026","Categoria":"Lazer","Descrição":"Streaming","Forma":"Cartão de crédito","Valor":39.9},
+        {"Data":"17/09/2026","Categoria":"Cuidados pessoais","Descrição":"Salão de beleza","Forma":"Pix","Valor":120.0},
+        {"Data":"20/09/2026","Categoria":"Transporte","Descrição":"Estacionamento","Forma":"Cartão de débito","Valor":35.0},
+        {"Data":"23/09/2026","Categoria":"Alimentação","Descrição":"Delivery","Forma":"Cartão de crédito","Valor":58.9},
+        {"Data":"25/09/2026","Categoria":"Compras","Descrição":"Roupas","Forma":"Cartão de crédito","Valor":159.9}
+    ];
+
+    const FACTOR = 1.25;
+    let chart;
+
+    function fmt(val) { return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+    function render() {
+        let total = 0, max = 0, cats = {};
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        despesasData.forEach(item => {
+            const vOrig = item.Valor || 0;
+            const vAum = vOrig * FACTOR;
+            total += vAum;
+            if(vAum > max) max = vAum;
+            cats[item.Categoria] = (cats[item.Categoria] || 0) + vAum;
+
+            tbody.innerHTML += `<tr>
+                <td>${item.Data||'-'}</td>
+                <td>${item.Categoria||'-'}</td>
+                <td>${item.Descrição||'-'}</td>
+                <td>${item.Forma||'-'}</td>
+                <td>${fmt(vOrig)}</td>
+                <td style="color:#d97706; font-weight:bold;">${fmt(vAum)}</td>
+            </tr>`;
+        });
+
+        document.getElementById('statTotal').innerText = fmt(total);
+        document.getElementById('statMedia').innerText = fmt(despesasData.length ? total / despesasData.length : 0);
+        document.getElementById('statMaior').innerText = fmt(max);
+
+        if(chart) chart.destroy();
+        chart = new Chart(document.getElementById('expensesChart'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(cats),
+                datasets: [{ label: 'Total (R$)', data: Object.values(cats), backgroundColor: '#4f46e5', borderRadius: 6 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    document.getElementById('excelInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            despesasData = json.map(r => ({
+                Data: r['Data']||'', Categoria: r['Categoria']||'Geral',
+                Descrição: r['Descrição']||'', Forma: r['Forma de pagamento']||'',
+                Valor: parseFloat(r['Valor (R$)']||r['Valor']||0)
+            }));
+            render();
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function exportToCSV() {
+        let csv = "Data,Categoria,Descrição,Forma,Valor Original,Valor Aumentado\n";
+        despesasData.forEach(i => {
+            csv += `"${i.Data}","${i.Categoria}","${i.Descrição}","${i.Forma}",${i.Valor},${(i.Valor*FACTOR).toFixed(2)}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'despesas_priscila.csv'; a.click();
+    }
+
+    function exportToWord() {
+        const html = `<html><body><h2>Relatório de Despesas - Priscila Rodrigues</h2>${document.getElementById('expensesTable').outerHTML}</body></html>`;
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'relatorio_despesas.doc'; a.click();
+    }
+
+    window.onload = render;
+</script>
+</body>
+</html>
